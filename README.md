@@ -1,9 +1,9 @@
 archlinux-nix
 =============
 
-This is a script that helps set up [Nix][1] on [Archlinux][2]. 
+This is a script that helps set up [Nix][1] on [Archlinux][2].  Please note that it's not very well tested as yet!
 
-There are tewo main functions:
+There are two main functions:
 
 1. creating a build group and set of build users; and
 2. setting up a sandbox for builds.
@@ -27,6 +27,8 @@ of that for you.
 Installation
 ------------
 
+There is no AUR package yet...
+
 ```
 install archlinux-nix /usr/local/bin
 ```
@@ -34,6 +36,26 @@ install archlinux-nix /usr/local/bin
 
 Usage
 -----
+
+## Status
+
+```
+archlinux-nix status
+```
+
+Displays some info about whether nix is installed, etc.
+
+
+## Install nix
+
+```
+archlinux-nix install
+```
+
+This code (mostly pilfered from the [official install script][5]) will
+download nix in binary format, install it into `/nix` and add environment
+setup to `/etc/profile.d`.
+
 
 ## Set-up build users
 
@@ -83,7 +105,18 @@ archlinux-nix delete-build-group mygroup
 This will skip step 1 in the above series.
 
 
-## 
+## Setup sandboxing
+
+```
+archlinux-nix set-sandbox
+```
+
+
+## Stop sanboxing
+
+```
+archlinux-nix delete-sandbox
+```
 
 
 License
@@ -95,3 +128,4 @@ Licenced under the Apache License, Version 2.0.
 [2]: https://www.archlinux.org/
 [3]: https://nixos.org/nix/manual/#ssec-multi-user
 [4]: https://nixos.org/nix/manual/#conf-build-sandbox-paths
+[5]: https://nixos.org/nix/download.html
