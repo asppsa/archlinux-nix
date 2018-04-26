@@ -5,310 +5,382 @@ default_nixos_version="17.09"
 default_group="nixbld"
 conf_file=/etc/nix/nix.conf
 
+dest=/nix
+
+case $(uname -m) in
+  x86_64) system=x86_64-linux; hash=6312837aee33306cdbb351b75ba1638b89d21b30f0caf0346f9a742425f197ee ;;
+  i?86) system=i686-linux; hash=5333384cf1b2f0d9b66d3c4db2643649f0c20d1ed5a0f0dac47ad0092a5874a3 ;;
+  aarch64) system=aarch64-linux; hash=ffe6c5c014c47ca8476c696a55bbd96beffb71f32c5d1a5da66d338a2aebbf17 ;;
+  *) system=""; hash="" ;;
+esac
+
+oops() {
+  echo "$0:" "$@" >&2
+  exit 1
+}
+
+install() {
+  if [ -z "$system" ]; then
+    oops "No binary is available for this system"
+  fi
+
+  tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
+    oops "Can\'t create temporary directory for downloading the Nix binary tarball")"
+
+  cleanup() {
+    rm -rf "$tmpDir"
+  }
+  trap cleanup EXIT INT QUIT TERM
+
+  tarball="$tmpDir/$(basename "$tmpDir/nix-2.0-$system.tar.bz2")"
+  url="https://nixos.org/releases/nix/nix-2.0/nix-2.0-$system.tar.bz2"
+
+  echo "downloading Nix 2.0 binary tarball for $system from '$url' to '$tmpDir'..."
+  curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
+
+  hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
+
+  if [ "$hash" != "$hash2" ]; then
+    oops "SHA-256 hash mismatch in '$url'; expected $hash, got $hash2"
+  fi
+
+  unpack=$tmpDir/unpack
+  mkdir -p "$unpack"
+  < "$tarball" bzcat | tar x -C "$unpack" || oops "failed to unpack '$url'"
+  self="$unpack/nix-2.0-$system"
+
+  mkdir -pm 0755 "$dest/store" && chown root.root "$dest" "$dest/store"
+  cp -a -t "$dest/store/" "$self/store/"* || oops "failed to copy store"
+
+  nix="$dest/store/$(cd "$self/store" && ls -d *-nix-*)"
+
+  echo "initialising Nix database..." >&2
+  if ! "$nix/bin/nix-store" --init; then
+    oops "failed to initialize the Nix database"
+  fi
+
+  if ! "$nix/bin/nix-store" --load-db < "$self/.reginfo"; then
+    oops "unable to register valid paths"
+  fi
+
+  . "$nix/etc/profile.d/nix.sh"
+
+  if ! "$nix/bin/nix-env" -i "$nix"; then
+    oops "unable to install Nix into your default profile"
+  fi
+
+  ln -s /nix/var/nix/profiles/default/etc/profile.d/nix*.sh /etc/profile.d/
+}
+
 install_sandbox() {
-    version=$1
-    mkdir -p /nix/var/nix/profiles/arch-system || exit 1
-    NIX_REMOTE="" nix-build \
-	      --option build-use-sandbox false \
-	      -o /nix/var/nix/profiles/arch-system/build-sandbox \
-	      -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/$version.tar.gz \
-	      -E 'with import <nixpkgs> {}; buildEnv { name = "arch-system-build-sandbox"; paths = [ bash bzip2 coreutils gnutar gzip perl xz ]; }' || exit 1
+  version=$1
+  mkdir -p /nix/var/nix/profiles/arch-system || exit 1
+  NIX_REMOTE="" nix-build \
+    --option build-use-sandbox false \
+    -o /nix/var/nix/profiles/arch-system/build-sandbox \
+    -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/$version.tar.gz \
+    -E 'with import <nixpkgs> {}; buildEnv { name = "arch-system-build-sandbox"; paths = [ bash bzip2 coreutils gnutar gzip perl xz ]; }' || exit 1
 }
 
 sandbox_exists() {
-    [ -d /nix/var/nix/profiles/arch-system/build-sandbox ]
+  [ -d /nix/var/nix/profiles/arch-system/build-sandbox ]
 }
 
 delete_sandbox() {
-    rm -r /nix/var/nix/profiles/arch-system/build-sandbox
+  rm -r /nix/var/nix/profiles/arch-system/build-sandbox
 }
 
 sandbox_path() {
-    readlink -f "/nix/var/nix/profiles/arch-system/build-sandbox/bin/$1"
+  readlink -f "/nix/var/nix/profiles/arch-system/build-sandbox/bin/$1"
 }
 
 sandbox_paths() {
-    [ -f "$conf_file" ] && grep '^\s*build-sandbox-paths\s*=' "$conf_file" | sed 's/^[^=]*=\s*\(.*\)$/\1/'
+  [ -f "$conf_file" ] && grep '^\s*build-sandbox-paths\s*=' "$conf_file" | sed 's/^[^=]*=\s*\(.*\)$/\1/'
 }
 
 gen_sandbox_paths() {
-    paths="/bin/sh=$(sandbox_path bash)"
-    for bin in $sandbox_binaries; do
-	paths+=" /usr/bin/$bin=$(sandbox_path $bin)"
-    done
-    echo "build-sandbox-paths = $paths"
+  paths="/bin/sh=$(sandbox_path bash)"
+  for bin in $sandbox_binaries; do
+    paths+=" /usr/bin/$bin=$(sandbox_path $bin)"
+  done
+  echo "build-sandbox-paths = $paths"
 }
 
 delete_sandbox_paths() {
-    if [ -f "$conf_file" ]; then
-	sed -i '/^\s*build-sandbox-paths\s*=/ d' "$conf_file"
-    fi
+  if [ -f "$conf_file" ]; then
+    sed -i '/^\s*build-sandbox-paths\s*=/ d' "$conf_file"
+  fi
 }
 
 # Append the sandbox paths into the given file
 append_sandbox_paths() {
-    delete_sandbox_paths
-    gen_sandbox_paths >> "$conf_file"
+  delete_sandbox_paths
+  gen_sandbox_paths >> "$conf_file"
 }
 
 group_exists() {
-    group=$1
-    [[ -n $(cut -d: -f1 /etc/group | grep -w $group) ]]
+  group=$1
+  [[ -n $(cut -d: -f1 /etc/group | grep -w $group) ]]
 }
 
 user_exists() {
-    user=$1
-    [[ -n $(cut -d: -f1 /etc/passwd | grep -w $user) ]]
+  user=$1
+  [[ -n $(cut -d: -f1 /etc/passwd | grep -w $user) ]]
 }
 
 check_no_group_or_users() {
-    group=$1
+  group=$1
 
-    if group_exists $group; then
-	echo "Group $group already exists.  Cannot proceed"
-	exit 1
+  if group_exists $group; then
+    oops "Group $group already exists.  Cannot proceed"
+  fi
+
+  for i in {1..10}; do
+    user=$group$i
+    if user_exists $user; then
+      oops "User $user already exists.  Cannot proceed"
     fi
-
-    for i in {1..10}; do
-	user=$group$i
-	if user_exists $user; then
-	    echo "User $user already exists.  Cannot proceed"
-	    exit 1
-	fi
-    done
+  done
 }
 
 create_users() {
-    group=$1
+  group=$1
 
-    check_no_group_or_users $group || exit 1
-    
-    # Create a nixbld group.
-    groupadd -r $group
+  check_no_group_or_users $group || exit 1
 
-    # Create 10 users
-    for i in {1..10}; do
-	user=$group$i
-	useradd -g $group -G $group -r -N -M -d /var/empty -s /sbin/nologin $user
-    done
+  # Create a nixbld group.
+  groupadd -r $group
+
+  # Create 10 users
+  for i in {1..10}; do
+    user=$group$i
+    useradd -g $group -G $group -r -N -M -d /var/empty -s /sbin/nologin $user
+  done
 }
 
 delete_users() {
-    group=$1
+  group=$1
 
-    # Remove the users
-    for i in {1..10}; do
-	user=$group$i
-	userdel $user
-    done
+  # Remove the users
+  for i in {1..10}; do
+    user=$group$i
+    userdel $user
+  done
 
-    # Remove the group
-    groupdel $group
+  # Remove the group
+  groupdel $group
 }
 
 delete_build_group() {
-    if [ -f "$conf_file" ]; then
-	sed -i '/^\s*build-users-group\s*=/ d' "$conf_file"
-    fi
+  if [ -f "$conf_file" ]; then
+    sed -i '/^\s*build-users-group\s*=/ d' "$conf_file"
+  fi
 }
 
 append_build_group() {
-    delete_build_group
+  delete_build_group
 
-    group=$1
-    echo "build-users-group = $group" >> "$conf_file"
+  group=$1
+  echo "build-users-group = $group" >> "$conf_file"
 }
 
 create_store() {
-    group=$1
+  group=$1
 
-    # Create nix folders and set permissions
-    mkdir -p /nix/store
-    chown root.$group /nix/store
-    chmod 1775 /nix/store
-    mkdir -p -m 1777 /nix/var/nix/gcroots/per-user
-    mkdir -p -m 1777 /nix/var/nix/profiles/per-user
+  # Create nix folders and set permissions
+  mkdir -p /nix/store
+  chown root.$group /nix/store
+  chmod 1775 /nix/store
+  mkdir -p -m 1777 /nix/var/nix/gcroots/per-user
+  mkdir -p -m 1777 /nix/var/nix/profiles/per-user
 }
 
 restore_store() {
-    # Restore folder permissions
-    chmod 755 /nix/store
-    chown root.root /nix/store
+  # Restore folder permissions
+  chmod 755 /nix/store
+  chown root.root /nix/store
 }
 
 build_users_group() {
-    [ -f "$conf_file" ] && grep '^\s*build-users-group\s*=' "$conf_file" | sed 's/^.*=\s*\(\w*\)\W/\1/'
+  [ -f "$conf_file" ] && grep '^\s*build-users-group\s*=' "$conf_file" | sed 's/^.*=\s*\(\w*\)\W/\1/'
 }
 
 using_sandbox() {
-    [ -f "$conf_file" ] && grep -q '^\s*build-use-sandbox\s*=\s*true' "$conf_file"
+  [ -f "$conf_file" ] && grep -q '^\s*build-use-sandbox\s*=\s*true' "$conf_file"
 }
 
 delete_use_sandbox() {
-    if [ -f "$conf_file" ]; then
-	sed -i '/^\s*build-use-sandbox\s*=/ d' "$conf_file"
-    fi
+  if [ -f "$conf_file" ]; then
+    sed -i '/^\s*build-use-sandbox\s*=/ d' "$conf_file"
+  fi
 }
 
 append_use_sandbox() {
-    delete_use_sandbox
-    echo 'build-use-sandbox = true' >> "$conf_file"
+  delete_use_sandbox
+  echo 'build-use-sandbox = true' >> "$conf_file"
 }
 
 do_status() {
-    sandbox=no
-    using_sandbox && sandbox=yes
-    group=$(build_users_group)
+  sandbox=no
+  using_sandbox && sandbox=yes
+  group=$(build_users_group)
 
-    if [ -n "$group" ]; then
-	echo "Configured build group: $group"
+  if [ -n "$group" ]; then
+    echo "Configured build group: $group"
 
-	exists=no
-	group_exists $group && exists=yes
-	echo "Group exists: $exists"
+    exists=no
+    group_exists $group && exists=yes
+    echo "Group exists: $exists"
 
-	exists=yes
-	for user in $group{1..10}; do
-	    if ! user_exists $user; then
-		exists=no
-		break
-	    fi
-	done
+    exists=yes
+    for user in $group{1..10}; do
+      if ! user_exists $user; then
+        exists=no
+        break
+      fi
+    done
 
-	echo "Users exist: $exists"
+    echo "Users exist: $exists"
+  else
+    echo "No configured build group."
+  fi
+
+  echo "Using sandbox (recommended): $sandbox"
+
+  if [ $sandbox = yes ]; then
+    exists=no
+    sandbox_exists && exists=yes
+    echo "Sandbox exists: $exists"
+
+    paths=$(sandbox_paths)
+
+    if [ -n "$paths" ]; then
+      echo "Sandbox paths:"
+      for path in $paths; do
+        echo " - $path"
+      done
     else
-	echo "No configured build group."
+      echo "Sandbox paths missing from config file"
     fi
-
-    echo "Using sandbox (recommended): $sandbox"
-
-    if [ $sandbox = yes ]; then
-	exists=no
-	sandbox_exists && exists=yes
-	echo "Sandbox exists: $exists"
-
-	paths=$(sandbox_paths)
-
-	if [ -n "$paths" ]; then
-	    echo "Sandbox paths:"
-	    for path in $paths; do
-		echo " - $path"
-	    done
-	else
-	    echo "Sandbox paths missing from config file"
-	fi
-    fi
+  fi
 }
 
 do_set_sandbox() {
-    version=$1
+  version=$1
 
-    if [ -z "$version" ]; then
-	version=$default_nixos_version
-    fi
+  if [ -z "$version" ]; then
+    version=$default_nixos_version
+  fi
 
-    echo "Installing sandbox binaries from NixOS-$version ..."
-    install_sandbox $version || exit 1
+  echo "Installing sandbox binaries from NixOS-$version ..."
+  install_sandbox $version || exit 1
 
-    echo "Adding build-sandbox-paths to "$conf_file" ..."
-    append_sandbox_paths || exit 1
+  echo "Adding build-sandbox-paths to "$conf_file" ..."
+  append_sandbox_paths || exit 1
 
-    echo "Enabling sandboxing ..."
-    append_use_sandbox || exit 1
+  echo "Enabling sandboxing ..."
+  append_use_sandbox || exit 1
 
-    echo "Killing daemon ..."
-    systemctl stop nix-daemon
+  echo "Killing daemon ..."
+  systemctl stop nix-daemon
 }
 
 do_delete_sandbox() {
-    echo "Removing sandbox config ..."
-    delete_sandbox_paths || exit 1
-    delete_use_sandbox || exit 1
+  echo "Removing sandbox config ..."
+  delete_sandbox_paths || exit 1
+  delete_use_sandbox || exit 1
 
-    echo "Killing daemon ..."
-    systemctl stop nix-daemon
+  echo "Killing daemon ..."
+  systemctl stop nix-daemon
 
-    echo "Unlinking sandbox ..."
-    delete_sandbox || exit 1
+  echo "Unlinking sandbox ..."
+  delete_sandbox || exit 1
 
-    echo "You may wish to run 'nix-store --gc' to delete files"
+  echo "You may wish to run 'nix-store --gc' to delete files"
 }
 
 do_set_build_group() {
-    group=$1
+  group=$1
 
-    if [ -z "$group" ]; then
-	group=$default_group
+  if [ -z "$group" ]; then
+    group=$default_group
+  fi
+
+  echo "Creating group $group and users ..."
+  create_users $group
+
+  echo "Setting group in "$conf_file" ..."
+  append_build_group $group
+
+  echo "Killing daemon ..."
+  systemctl stop nix-daemon
+
+  echo "Setting permissions on nix store ..."
+  create_store $group
+}
+
+do_delete_build_group() {
+  group=$1
+
+  if [ -z $group ]; then
+    group=$(build_users_group)
+    if [ -z $group ]; then
+      oops "No existing group setup"
     fi
+  fi
 
-    echo "Creating group $group and users ..."
-    create_users $group
+  echo "Deleting build group $group ..."
 
-    echo "Setting group in "$conf_file" ..."
-    append_build_group $group
+  if [ "$(build_users_group)" = "$group" ]; then
+    echo "Removing build group from "$conf_file" ..."
+    delete_build_group
 
     echo "Killing daemon ..."
     systemctl stop nix-daemon
 
-    echo "Setting permissions on nix store ..."
-    create_store $group
+    echo "Resetting permissions on nix store ..."
+    restore_store
+  fi
+
+  echo "Deleting group and users ..."
+  delete_users $group
 }
 
-do_delete_build_group() {
-    group=$1
-
-    if [ -z $group ]; then
-	group=$(build_users_group)
-	if [ -z $group ]; then
-	    echo "No existing group setup"
-	    exit 1
-	fi
-    fi
-
-    echo "Deleting build group $group ..."
-
-    if [ "$(build_users_group)" = "$group" ]; then
-	echo "Removing build group from "$conf_file" ..."
-	delete_build_group
-	
-	echo "Killing daemon ..."
-	systemctl stop nix-daemon
-
-	echo "Resetting permissions on nix store ..."
-	restore_store
-    fi
-
-    echo "Deleting group and users ..."
-    delete_users $group
+do_install() {
+  install
 }
 
 usage() {
-    echo "$(basename $0) <COMMAND>"
-    echo -e "\nCOMMAND:"
-    echo -e "\tstatus\n\t\tList current status"
+  echo "$(basename $0) <COMMAND>"
+  echo -e "\nCOMMAND:"
 
-    echo -e "\tset-sandbox [VERSION]"
-    echo -e "\t\tSetup sandbox using binaries from specified NixOS version (defaults to $default_nixos_version)"
+  echo -e "\tinstall\n\t\tInstall Nix"
 
-    echo -e "\tdelete-sandbox"
-    echo -e "\t\tDelete sandbox and remove sandbox config"
+  echo -e "\tstatus\n\t\tList current status"
 
-    echo -e "\tset-build-group [GROUP]"
-    echo -e "\t\tCreate a group of build users and add to config (defaults to $default_group)"
+  echo -e "\tset-sandbox [VERSION]"
+  echo -e "\t\tSetup sandbox using binaries from specified NixOS version (defaults to $default_nixos_version)"
 
-    echo -e "\tdelete-build-group [GROUP]"
-    echo -e "\t\tDelete group and users (defaults to existing group given in nix.conf)"
+  echo -e "\tdelete-sandbox"
+  echo -e "\t\tDelete sandbox and remove sandbox config"
+
+  echo -e "\tset-build-group [GROUP]"
+  echo -e "\t\tCreate a group of build users and add to config (defaults to $default_group)"
+
+  echo -e "\tdelete-build-group [GROUP]"
+  echo -e "\t\tDelete group and users (defaults to existing group given in nix.conf)"
 }
 
 command=$1
 shift
 
 case $command in
-    'status') do_status;;
-    'set-sandbox') do_set_sandbox "$@";;
-    'delete-sandbox') do_delete_sandbox "$@";;
-    'set-build-group') do_set_build_group "$@";;
-    'delete-build-group') do_delete_build_group "$@";;
-    'help' | '--help' | '-h' | '') usage;;
-    *)  echo "$(basename $0): unknown option '$command $@'"; exit 1;;
+  'install') do_install ;;
+  'status') do_status ;;
+  'set-sandbox') do_set_sandbox "$@" ;;
+  'delete-sandbox') do_delete_sandbox "$@" ;;
+  'set-build-group') do_set_build_group "$@" ;;
+  'delete-build-group') do_delete_build_group "$@" ;;
+  'help' | '--help' | '-h' | '') usage ;;
+  *)  oops "$(basename $0): unknown option '$command $@'" ;;
 esac
