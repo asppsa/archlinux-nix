@@ -50,22 +50,22 @@ do_install() {
   }
   trap cleanup EXIT INT QUIT TERM
 
-  tarball="$tmpDir/$(basename "$tmpDir/nix-$nix_version-$system.tar.bz2")"
-  url="https://nixos.org/releases/nix/nix-$nix_version/nix-$nix_version-$system.tar.bz2"
+  local tarball="$tmpDir/$(basename "$tmpDir/nix-$nix_version-$system.tar.bz2")"
+  local url="https://nixos.org/releases/nix/nix-$nix_version/nix-$nix_version-$system.tar.bz2"
 
   echo "downloading Nix $nix_version binary tarball for $system from '$url' to '$tmpDir'..."
   curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
 
-  hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
+  local hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
 
   if [ "$hash" != "$hash2" ]; then
     oops "SHA-256 hash mismatch in '$url'; expected $hash, got $hash2"
   fi
 
-  unpack=$tmpDir/unpack
+  local unpack=$tmpDir/unpack
   mkdir -p "$unpack"
   < "$tarball" bzcat | tar x -C "$unpack" || oops "failed to unpack '$url'"
-  self="$unpack/nix-$nix_version-$system"
+  local self="$unpack/nix-$nix_version-$system"
 
   mkdir -pm 0755 "$dest/store" && chown root.root "$dest" "$dest/store"
   cp -a -t "$dest/store/" "$self/store/"* || oops "failed to copy store"
