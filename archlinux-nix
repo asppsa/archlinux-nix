@@ -26,8 +26,11 @@ pm_installed() {
 }
 
 nix_installed() {
-  local nix=$(which nix 2>/dev/null)
-  [ ! -z $nix ] && echo `realpath $nix` | grep -q '^/nix'
+  [ -f "$dest"/var/nix/profiles/default/bin/nix ]
+}
+
+is_installed() {
+  pm_installed || nix_installed
 }
 
 do_install() {
@@ -127,9 +130,15 @@ delete_sandbox_paths() {
   fi
 }
 
+create_config() {
+  mkdir -p $(dirname "$conf_file")
+  touch "$conf_file"
+}
+
 # Append the sandbox paths into the given file
 append_sandbox_paths() {
   delete_sandbox_paths
+  create_config
   gen_sandbox_paths >> "$conf_file"
 }
 
@@ -196,6 +205,7 @@ append_build_group() {
   delete_build_group
 
   group=$1
+  create_config
   echo "build-users-group = $group" >> "$conf_file"
 }
 
@@ -232,6 +242,7 @@ delete_use_sandbox() {
 
 append_disable_sandbox() {
   delete_use_sandbox
+  create_config
   echo 'build-use-sandbox = false' >> "$conf_file"
 }
 
