@@ -73,17 +73,17 @@ do_install() {
   local nix="$dest/store/$(cd "$self/store" && ls -d *-nix-$nix_version)"
 
   echo "Initialising Nix database..." >&2
-  if ! "$nix/bin/nix-store" --init; then
+  if ! "$nix/bin/nix-store" --option build-users-group "" --init; then
     oops "failed to initialize the Nix database"
   fi
 
-  if ! "$nix/bin/nix-store" --load-db < "$self/.reginfo"; then
+  if ! "$nix/bin/nix-store" --option build-users-group "" --load-db < "$self/.reginfo"; then
     oops "unable to register valid paths"
   fi
 
   . "$nix/etc/profile.d/nix.sh"
 
-  if ! "$nix/bin/nix-env" -i "$nix"; then
+  if ! "$nix/bin/nix-env" --option build-users-group "" -i "$nix"; then
     oops "unable to install Nix into your default profile"
   fi
 
