@@ -1,33 +1,31 @@
 archlinux-nix
 =============
 
-This is a script that helps set up [Nix][1] on [Archlinux][2].
+This is a script that helps set up [Nix][nix] on [Arch Linux][arch]. It supports
+two distinct ways of installing Nix:
 
-There are two main functions:
+1. Via [AUR][aur], using the [nix package][aur-nix]; or
+2. Directly via Nix (i.e. Nix is "self-hosted").
+
+In the case of the latter, this script helps to install Nix.  You can also use
+the [official installer][nix-official-install].
+
+Other scripts
 
 1. creating a build group and set of build users; and
 2. setting up a sandbox for builds.
-
-
-Why?
-----
-
-If you want to use Nix as a non-root user, you need to set up
-[multi-user mode][3].  This requires creating build users, which is a
-tad menial to do over and over, so here's a script to do it for you.
-
-The other thing you will find using Nix on Arch Linux (and probably
-other linuces for that matter) is that the presence of libraries in
-/usr can cause problems when compiling some programs in Nixpkgs.  The
-solution to this is to use [sandboxing][4], which is another thing
-that is a bit of a pain to set up; so this script can also take care
-of that for you.
+3. launching the nix-daemon.
 
 
 Installation
 ------------
 
-There is no AUR package yet...
+This script is available via the Arch Linux [AUR][aur].  You can install either
+the [archlinux-nix package][archlinux-nix] or the
+[archlinux-nix-git package][archlinux-nix-git] if you want the bleeding edge.
+
+Alternatively, if you attempting to use this script elsewhere, you can clone
+this repo and do the following:
 
 ```
 install archlinux-nix /usr/local/bin
@@ -37,22 +35,35 @@ install archlinux-nix /usr/local/bin
 Usage
 -----
 
+## Basic usage
+
+If you are installing Nix from AUR, this script is called automatically, so you
+shouldn't need to execute this script at all.  If you want to do a
+"self-hosted" install, you can execute the following (as root):
+
+```
+archlinux-nix boostrap
+```
+
+This will "intelligently" execute various commands (described below) with
+sensible defaults to get you up and running.
+
 ## Status
 
 ```
 archlinux-nix status
 ```
 
-Displays some info about whether nix is installed, etc.
+Displays some info about whether Nix is installed, etc.
 
 
-## Install nix
+## Install "self-hosted" Nix
 
 ```
 archlinux-nix install
 ```
 
-This code (mostly pilfered from the [official install script][5]) will
+This code (mostly pilfered from the [official install script][nix-official-install]) will
 download nix in binary format, install it into `/nix` and add environment
 setup to `/etc/profile.d`.
 
@@ -60,7 +71,7 @@ setup to `/etc/profile.d`.
 ## Set-up build users
 
 ```
-archlinux-nix set-build-group
+archlinux-nix setup-build-group
 ```
 
 This will:
@@ -76,7 +87,7 @@ This will:
 If you don't like `nixbld`, you can specify a different name:
 
 ```
-archlinux-nix set-build-group mynixbuild
+archlinux-nix setup-build-group mynixbuild
 ```
 
 This would create a group called `mynixbuild`, and users
@@ -96,7 +107,8 @@ This will:
 4. remove the ten users associated with the group; and
 5. remove the group itself.
 
-You can also specify a group name:
+You can also specify a group name to delete a group of users that are not
+specified in nix.conf:
 
 ```
 archlinux-nix delete-build-group mygroup
@@ -107,25 +119,53 @@ This will skip step 1 in the above series.
 
 ## Setup sandboxing
 
+Note that by default sandboxing is enabled in Nix.  For a self-hosted Nix
+install, no additional configuration is needed.  If you installed Nix via
+AUR, sandboxind is setup automatically using the following command:
+
 ```
-archlinux-nix set-sandbox
+archlinux-nix install-sandbox
 ```
 
+This creates a Nix profile at `/nix/var/nix/profiles/arch-system/build-sandbox`
+that includes the essential scripts required to build nix expressions
+(bash, tar, etc.), and the references these in `/etc/nix/nix.conf`.
 
-## Stop sanboxing
+## Stop sandboxing
 
 ```
 archlinux-nix delete-sandbox
+archlinux-nix disable-sandbox
 ```
 
+The former command will do the opposite of `install-sandbox` (i.e. remove the
+`build-sandbox` profile and any mention of it from `nix.conf`); the latter
+command will disable sanboxing entirely by adding a line to that effect to
+`nix.conf`.
+
+## Stopping/starting nix-daemon
+
+```
+archlinux-nix enable-nix-daemon
+```
+
+This will link (if required) and launch the `nix-daemon` systemd service/socket.
+
+```
+archlinux-nix disable-nix-daemon
+```
+
+This will do the opposite.
 
 License
 -------
 
 Licenced under the Apache License, Version 2.0.
 
-[1]: https://nixos.org/nix/
-[2]: https://www.archlinux.org/
-[3]: https://nixos.org/nix/manual/#ssec-multi-user
-[4]: https://nixos.org/nix/manual/#conf-build-sandbox-paths
-[5]: https://nixos.org/nix/download.html
+[nix]: https://nixos.org/nix/
+[arch]: https://www.archlinux.org/
+[nix-official-install]: https://nixos.org/nix/download.html
+[archlinux-nix]: https://aur.archlinux.org/packages/archlinux-nix
+[archlinux-nix-git]: https://aur.archlinux.org/packages/archlinux-nix-git
+[aur]: https://aur.archlinux.org/
+[aur-nix]: https://aur.archlinux.org/packages/nix/
