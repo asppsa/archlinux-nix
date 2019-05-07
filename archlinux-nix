@@ -17,7 +17,7 @@ case $(uname -m) in
 esac
 
 oops() {
-  echo "$0:" "$@" >&2
+  echo -e "$0:" "$@" >&2
   exit 1
 }
 
@@ -497,11 +497,81 @@ do_disable_nix_daemon() {
   fi
 }
 
+do_bootstrap_system() {
+  # Step 1: install Nix
+  if ! is_installed; then
+    do_install || exit 1
+  fi
+
+  # Step 2: setup sandboxing if required
+  if pm_installed && ( ! sandbox_disabled ) && [ -z "$(sandbox_paths)" ]; then
+    do_install_sandbox || exit 1
+  fi
+
+  # Step 3: setup build users
+  local group=$(build_users_group)
+  if [ -z "$group" ] || ( ! group_exists $group ); then
+    do_setup_build_group || exit 1
+  fi
+
+  # Step 4: launch the daemon
+  do_enable_nix_daemon || exit 1
+
+  echo "Nix is bootstrapped.  You may need to bootstrap your user account also:"
+  echo -e "\tarchlinux-nix bootstrap-user"
+}
+
+do_bootstrap_user() {
+  if ! is_installed; then
+    oops "You need to install Nix first. Run as root:\n\t$0 bootstrap-system"
+  fi
+
+  # Step 1: source the environment vars if required
+  if [ -z "$NIX_PATH" ]; then
+    echo "Sourcing /etc/profile.d files ..."
+    source /etc/profile.d/nix{,-daemon}.sh || exit 1
+  fi
+
+  # Step 2: ensure that the user has a profile
+  if [ ! -L "$HOME/.nix-profile" ]; then
+    oops "$HOME/.nix-profile should have been created when sourcing files in /etc/profile.d.  Cannot continue."
+  fi
+
+  local profile=$(readlink "$HOME/.nix-profile")
+  if [ ! -e "$profile" ]; then
+    local default="$dest"/var/nix/profiles/default
+    if [ ! -L "$default" ]; then
+      oops "No default Nix profile exists.  Cannot continue"
+    fi
+
+    echo "Linking to default profile ..."
+    ln -s "$(realpath "$default")" "$profile"
+  fi
+
+  # Check that bootstrapping has been a success
+  [ -e "$HOME/.nix-profile/bin/nix" ] || oops "Failed to setup user profile"
+
+  echo "Bootstrapping successful!  Please log out and back in to complete"
+}
+
 usage() {
   echo "$(basename $0) <COMMAND>"
   echo -e "\nCOMMAND:"
 
-  if [ ! pm_installed ]; then
+  echo -e "\tBasic Commands"
+  echo -e "\t--------------\n"
+
+  echo -e "\tbootstrap-system"
+  echo -e "\t\tRun this as root in order to setup Nix"
+
+  echo -e "\tbootstrap-user"
+  echo -e "\t\tEach user should run this once to setup an initial profile"
+
+  echo -e "\n"
+  echo -e "\tAdvanced Commands"
+  echo -e "\t-----------------\n"
+
+  if ! pm_installed; then
     echo -e "\tinstall\n\t\tInstall Nix"
   fi
 
@@ -530,10 +600,12 @@ usage() {
 }
 
 command=$1
-shift
+[ -n "$command" ] && shift
 
 case $command in
   'install') do_install ;;
+  'bootstrap-system') do_bootstrap_system ;;
+  'bootstrap-user') do_bootstrap_user ;;
   'status') do_status ;;
   'install-sandbox') do_install_sandbox "$@" ;;
   'delete-sandbox') do_delete_sandbox "$@" ;;
