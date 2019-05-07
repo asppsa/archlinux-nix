@@ -1,7 +1,7 @@
 archlinux-nix
 =============
 
-This is a script that helps set up [Nix][1] on [Archlinux][2].  Please note that it's not very well tested as yet!
+This is a script that helps set up [Nix][1] on [Archlinux][2].
 
 There are two main functions:
 
@@ -16,7 +16,7 @@ If you want to use Nix as a non-root user, you need to set up
 [multi-user mode][3].  This requires creating build users, which is a
 tad menial to do over and over, so here's a script to do it for you.
 
-The other thing you will find using Nix on Archlinux (and probably
+The other thing you will find using Nix on Arch Linux (and probably
 other linuces for that matter) is that the presence of libraries in
 /usr can cause problems when compiling some programs in Nixpkgs.  The
 solution to this is to use [sandboxing][4], which is another thing
