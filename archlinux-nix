@@ -216,14 +216,16 @@ create_store() {
   mkdir -p /nix/store
   chown root.$group /nix/store
   chmod 1775 /nix/store
-  mkdir -p -m 1777 /nix/var/nix/gcroots/per-user
-  mkdir -p -m 1777 /nix/var/nix/profiles/per-user
+  mkdir -p /nix/var/nix/gcroots/per-user
+  mkdir -p /nix/var/nix/profiles/per-user
+  chmod 1777 /nix/var/nix/{gcroots,profiles}/per-user
 }
 
 restore_store() {
   # Restore folder permissions
   chmod 755 /nix/store
   chown root.root /nix/store
+  chmod 755 /nix/var/nix/{gcroots,profiles}/per-user
 }
 
 build_users_group() {
