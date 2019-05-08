@@ -1,5 +1,5 @@
-prefix=/usr
-DESTDIR=
+DESTDIR=/
+prefix=usr
 
 install:
 	mkdir -p "${DESTDIR}${prefix}/bin"
