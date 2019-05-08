@@ -156,7 +156,12 @@ check_no_group_or_users() {
   group=$1
 
   if group_exists $group; then
-    oops "Group $group already exists.  Cannot proceed"
+    oops "Group '$group' already exists.  Cannot proceed\n\n\
+If this group is intended for use in Nix, add the following line to $conf_file\n\
+and try again:\n\n\
+build-users-group = $group\n\n\
+Otherwise, you can specify a different group name to use, e.g.:\n\n\
+$0 setup-build-group mynixbuild"
   fi
 
   for i in {1..10}; do
