@@ -538,39 +538,6 @@ do_bootstrap() {
   fi
 }
 
-do_bootstrap_user() {
-  if ! nix_installed; then
-    oops "This command is only applicable to self-installed nix"
-  fi
-
-  # Step 1: source the environment vars if required
-  if [ -z "$NIX_PATH" ]; then
-    echo "Sourcing /etc/profile.d files ..."
-    source /etc/profile.d/nix{,-daemon}.sh || exit 1
-  fi
-
-  # Step 2: ensure that the user has a profile
-  if [ ! -L "$HOME/.nix-profile" ]; then
-    oops "$HOME/.nix-profile should have been created when sourcing files in /etc/profile.d.  Cannot continue."
-  fi
-
-  local profile=$(readlink "$HOME/.nix-profile")
-  if [ ! -e "$profile" ]; then
-    local default="$dest"/var/nix/profiles/default
-    if [ ! -L "$default" ]; then
-      oops "No default Nix profile exists.  Cannot continue"
-    fi
-
-    echo "Linking to default profile ..."
-    ln -s "$(realpath "$default")" "$profile"
-  fi
-
-  # Check that bootstrapping has been a success
-  [ -e "$HOME/.nix-profile/bin/nix" ] || oops "Failed to setup user profile"
-
-  echo "Bootstrapping successful!  Please log out and back in to complete"
-}
-
 usage() {
   echo "$(basename $0) <COMMAND>"
   echo -e "\nCOMMAND:"
