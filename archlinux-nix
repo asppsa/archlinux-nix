@@ -1,6 +1,7 @@
 #!/bin/sh
 
 sandbox_binaries="bash bzip2 env gzip mkdir mv tar tr xz"
+sandbox_packages="bash bzip2 coreutils gnutar gzip xz"
 default_nixos_version="19.03"
 default_group="nixbld"
 conf_file=/etc/nix/nix.conf
@@ -97,7 +98,7 @@ install_sandbox() {
     --option build-use-sandbox false \
     -o $dest/var/nix/profiles/arch-system/build-sandbox \
     -I nixpkgs=https://github.com/NixOS/nixpkgs/archive/$version.tar.gz \
-    -E 'with import <nixpkgs> {}; buildEnv { name = "arch-system-build-sandbox"; paths = [ bash bzip2 coreutils gnutar gzip perl xz ]; }' || exit 1
+    -E "with import <nixpkgs> {}; buildEnv { name = \"arch-system-build-sandbox\"; paths = [ $sandbox_packages ]; }" || exit 1
 }
 
 sandbox_exists() {
