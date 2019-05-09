@@ -153,38 +153,24 @@ user_exists() {
   [[ -n $(cut -d: -f1 /etc/passwd | grep -w $user) ]]
 }
 
-check_no_group_or_users() {
-  group=$1
-
-  if group_exists $group; then
-    oops "Group '$group' already exists.  Cannot proceed\n\n\
-If this group is intended for use in Nix, add the following line to $conf_file\n\
-and try again:\n\n\
-build-users-group = $group\n\n\
-Otherwise, you can specify a different group name to use, e.g.:\n\n\
-$0 setup-build-group mynixbuild"
-  fi
-
-  for i in {1..10}; do
-    user=$group$i
-    if user_exists $user; then
-      oops "User $user already exists.  Cannot proceed"
-    fi
-  done
-}
-
 create_users() {
-  group=$1
-
-  check_no_group_or_users $group || exit 1
+  local group=$1
 
   # Create a nixbld group.
-  groupadd -r $group
+  if ! group_exists $group; then
+    groupadd -r $group
+  else
+    echo "Group '$group' already exists"
+  fi
 
   # Create 10 users
   for i in {1..10}; do
-    user=$group$i
-    useradd -g $group -G $group -r -N -M -d /var/empty -s /sbin/nologin $user
+    local user=$group$i
+    if ! user_exists $user; then
+      useradd -g $group -G $group -r -N -M -d /var/empty -s /sbin/nologin $user
+    else
+      echo "User '$user' already exists"
+    fi
   done
 }
 
@@ -435,7 +421,7 @@ do_setup_build_group() {
     group=$default_group
   fi
 
-  echo "Creating group $group and users ..."
+  echo "Creating group '$group' and users ..."
   create_users $group
 
   echo "Setting group in "$conf_file" ..."
