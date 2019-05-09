@@ -148,12 +148,12 @@ append_sandbox_paths() {
 
 group_exists() {
   local group=$1
-  [[ -n $(cut -d: -f1 /etc/group | grep -w $group) ]]
+  getent group $group > /dev/null
 }
 
 user_exists() {
   local user=$1
-  [[ -n $(cut -d: -f1 /etc/passwd | grep -w $user) ]]
+  getent passwd $user > /dev/null
 }
 
 create_users() {
