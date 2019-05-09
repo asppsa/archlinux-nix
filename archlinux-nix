@@ -89,6 +89,9 @@ do_install() {
   fi
 
   ln -s $dest/var/nix/profiles/default/etc/profile.d/nix*.sh /etc/profile.d/
+
+  echo -e "It is recommended that you now bootstrap the Nix install:\n\n\
+\t$0 bootstrap"
 }
 
 install_sandbox() {
@@ -494,7 +497,12 @@ do_disable_nix_daemon() {
 do_bootstrap() {
   # Step 1: install Nix
   if ! is_installed; then
-    do_install || exit 1
+    oops "You need to install Nix before bootstrapping.\n\
+You can install Nix from AUR:\n\n\
+\thttps://aur.archlinux.org/packages/nix/\n\n\
+Alternatively, you can use Nix itself to install Nix (\"self-hosted\" Nix) with\n\
+the help of this tool:\n\n\
+\t$0 install"
   fi
 
   # Step 2: setup sandboxing if required
