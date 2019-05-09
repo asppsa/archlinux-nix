@@ -22,8 +22,12 @@ oops() {
   exit 1
 }
 
+pm_path() {
+    which -a nix 2>/dev/null | grep '^/usr' | head -n 1
+}
+
 pm_installed() {
-  which nix 2>/dev/null | grep -q '^/usr'
+  [ -n "$(pm_path)" ]
 }
 
 nix_installed() {
@@ -301,7 +305,7 @@ load_daemon() {
 
 do_status() {
   if pm_installed; then
-    echo "Nix installed via package manager ($(which nix))"
+    echo "Nix installed via package manager ($(pm_path))"
   elif nix_installed; then
     echo "Nix self-installed"
   else
