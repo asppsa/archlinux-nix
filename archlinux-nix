@@ -524,14 +524,15 @@ the help of this tool:\n\n\
 
   echo "Nix is bootstrapped."
 
-  # Additional instructions for users that have installed nix without the Arch package.
+  # Additional instructions for users that have installed self-hosted nix
   if nix_installed; then
-    local nix="$(ls -d $dest/store/*-nix-$nix_version)"
+    local nix_env=$dest/var/nix/profiles/default/bin/nix-env
+    local nix=$(dirname $(dirname $(realpath "$nix_env")))
     echo
     echo "To get nix-* commands in your path, you need to ensure your local profile has the"
     echo "nix package installed.  It can be installed via the following command:"
     echo
-    echo -e "\t$dest/var/nix/profiles/default/bin/nix-env -i \"$nix\""
+    echo -e "\t\"$nix_env\" -i \"$nix\""
     echo
     echo "You also need to source the following files (or otherwise log out and in):"
     echo
@@ -547,18 +548,20 @@ usage() {
   echo -e "\tBasic Commands"
   echo -e "\t--------------\n"
 
+  if ! pm_installed; then
+    echo -e "\tinstall"
+    echo -e "\t\tInstall \"self-hosted\" Nix.  Note that it is also possible to install Nix using"
+    echo -e "\t\ta package manager (e.g. AUR)"
+  fi
+
   echo -e "\tbootstrap"
-  echo -e "\t\tRun this as root in order to setup Nix with sensible defaults"
+  echo -e "\t\tSetup Nix with sensible defaults"
+
+  echo -e "\tstatus\n\t\tList current status"
 
   echo -e "\n"
   echo -e "\tAdvanced Commands"
   echo -e "\t-----------------\n"
-
-  if ! pm_installed; then
-    echo -e "\tinstall\n\t\tInstall Nix"
-  fi
-
-  echo -e "\tstatus\n\t\tList current status"
 
   echo -e "\tinstall-sandbox [VERSION]"
   echo -e "\t\tSetup sandbox using binaries from specified NixOS version (defaults to $default_nixos_version)"
