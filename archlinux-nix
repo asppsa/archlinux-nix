@@ -43,7 +43,7 @@ do_install() {
     oops "No binary is available for this system"
   fi
 
-  tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
+  local tmpDir="$(mktemp -d -t nix-binary-tarball-unpack.XXXXXXXXXX || \
     oops "Can\'t create temporary directory for downloading the Nix binary tarball")"
 
   cleanup() {
@@ -92,7 +92,7 @@ do_install() {
 }
 
 install_sandbox() {
-  version=$1
+  local version=$1
   mkdir -p $dest/var/nix/profiles/arch-system || exit 1
   NIX_REMOTE="" nix-build \
     --option build-use-sandbox false \
@@ -118,7 +118,7 @@ sandbox_paths() {
 }
 
 gen_sandbox_paths() {
-  paths="/bin/sh=$(sandbox_path bash)"
+  local paths="/bin/sh=$(sandbox_path bash)"
   for bin in $sandbox_binaries; do
     paths+=" /usr/bin/$bin=$(sandbox_path $bin)"
   done
@@ -144,12 +144,12 @@ append_sandbox_paths() {
 }
 
 group_exists() {
-  group=$1
+  local group=$1
   [[ -n $(cut -d: -f1 /etc/group | grep -w $group) ]]
 }
 
 user_exists() {
-  user=$1
+  local user=$1
   [[ -n $(cut -d: -f1 /etc/passwd | grep -w $user) ]]
 }
 
@@ -175,9 +175,10 @@ create_users() {
 }
 
 delete_users() {
-  group=$1
+  local group=$1
 
   # Remove the users
+  local user
   for i in {1..10}; do
     user=$group$i
     userdel $user
@@ -196,13 +197,13 @@ delete_build_group() {
 append_build_group() {
   delete_build_group
 
-  group=$1
+  local group=$1
   create_config
   echo "build-users-group = $group" >> "$conf_file"
 }
 
 create_store() {
-  group=$1
+  local group=$1
 
   # Create nix folders and set permissions
   mkdir -p /nix/store
@@ -308,10 +309,11 @@ do_status() {
   sandbox_disabled && sandbox=no
   local group=$(build_users_group)
 
+  local exists
   if [ -n "$group" ]; then
     echo "Configured build group: $group"
 
-    local exists=no
+    exists=no
     group_exists $group && exists=yes
     echo "Group exists: $exists"
 
@@ -373,7 +375,7 @@ do_install_sandbox() {
     oops "Sandbox paths not required"
   fi
 
-  version=$1
+  local version=$1
 
   if [ -z "$version" ]; then
     version=$default_nixos_version
@@ -415,7 +417,7 @@ do_disable_sandbox() {
 }
 
 do_setup_build_group() {
-  group=$1
+  local group=$1
 
   if [ -z "$group" ]; then
     group=$default_group
@@ -435,7 +437,7 @@ do_setup_build_group() {
 }
 
 do_delete_build_group() {
-  group=$1
+  local group=$1
 
   if [ -z $group ]; then
     group=$(build_users_group)
