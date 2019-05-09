@@ -276,7 +276,7 @@ stop_daemon_socket() {
 start_daemon_socket() {
   if daemon_socket_loaded; then
     systemctl enable nix-daemon.socket
-    systemctl start nix-daemon.socket
+    systemctl restart nix-daemon.socket
   fi
 }
 
