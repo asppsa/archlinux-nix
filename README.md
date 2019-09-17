@@ -42,7 +42,7 @@ shouldn't need to execute this script at all.  If you want to do a
 "self-hosted" install, you can execute the following (as root):
 
 ```
-archlinux-nix boostrap
+archlinux-nix bootstrap
 ```
 
 This will "intelligently" execute various commands (described below) with
