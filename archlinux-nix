@@ -2,18 +2,18 @@
 
 sandbox_binaries="bash bzip2 env gzip mkdir mv tar tr xz"
 sandbox_packages="bash bzip2 coreutils gnutar gzip xz"
-default_nixos_version="19.03"
+default_nixos_version="19.09"
 default_group="nixbld"
 conf_file=/etc/nix/nix.conf
 
 dest=/nix
 
-nix_version=2.2.2
+nix_version=2.3.1
 
 case $(uname -m) in
-  x86_64) system=x86_64-linux; hash=7ce46548509837d4bc8d01b63973f8fb8972fbbe8ba6a9b5e929cf5954c3d85e;;
-  i?86) system=i686-linux; hash=b055b9ac5e65d43cb6b1d1fe99eb106371a6b5782c3522209a73f473dc7b8779;;
-  aarch64) system=aarch64-linux; hash=1d5c5ede3d7be3963f34f6b51a7b37b3ce3adc5ce623f2a50c11501b9c95bd4e;;
+  x86_64) system=x86_64-linux ;;
+  i?86) system=i686-linux ;;
+  aarch64) system=aarch64-linux ;;
   *) system=""; hash="" ;;
 esac
 
@@ -55,21 +55,22 @@ do_install() {
   }
   trap cleanup EXIT INT QUIT TERM
 
-  local tarball="$tmpDir/$(basename "$tmpDir/nix-$nix_version-$system.tar.bz2")"
-  local url="https://nixos.org/releases/nix/nix-$nix_version/nix-$nix_version-$system.tar.bz2"
+  local tarball="$tmpDir/nix-$nix_version-$system.tar.xz"
+  local url="https://nixos.org/releases/nix/nix-$nix_version/nix-$nix_version-$system.tar.xz"
 
   echo "downloading Nix $nix_version binary tarball for $system from '$url' to '$tmpDir'..."
   curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
 
+  local hash1=$(curl $url.sha256)
   local hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
 
-  if [ "$hash" != "$hash2" ]; then
-    oops "SHA-256 hash mismatch in '$url'; expected $hash, got $hash2"
+  if [ "$hash1" != "$hash2" ]; then
+    oops "SHA-256 hash mismatch in '$url'; expected $hash1, got $hash2"
   fi
 
   local unpack=$tmpDir/unpack
   mkdir -p "$unpack"
-  < "$tarball" bzcat | tar x -C "$unpack" || oops "failed to unpack '$url'"
+  < "$tarball" xzcat | tar x -C "$unpack" || oops "failed to unpack '$url'"
   local self="$unpack/nix-$nix_version-$system"
 
   mkdir -pm 0755 "$dest/store" && chown root.root "$dest" "$dest/store"
