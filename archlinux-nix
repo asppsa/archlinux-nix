@@ -56,7 +56,7 @@ do_install() {
   trap cleanup EXIT INT QUIT TERM
 
   local tarball="$tmpDir/nix-$nix_version-$system.tar.xz"
-  local url="https://nixos.org/releases/nix/nix-$nix_version/nix-$nix_version-$system.tar.xz"
+  local url="https://releases.nixos.org/nix/nix-$nix_version/nix-$nix_version-$system.tar.xz"
 
   echo "downloading Nix $nix_version binary tarball for $system from '$url' to '$tmpDir'..."
   curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
