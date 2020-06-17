@@ -2,13 +2,13 @@
 
 sandbox_binaries="bash bzip2 env gzip mkdir mv tar tr xz"
 sandbox_packages="bash bzip2 coreutils gnutar gzip xz"
-default_nixos_version="19.09"
+default_nixos_version="20.03"
 default_group="nixbld"
 conf_file=/etc/nix/nix.conf
 
 dest=/nix
 
-nix_version=2.3.1
+nix_version=2.3.5
 
 case $(uname -m) in
   x86_64) system=x86_64-linux ;;
@@ -164,25 +164,30 @@ user_exists() {
 create_users() {
   local group=$1
 
+  mkdir /etc/sysusers.d/ || true
+  :> /etc/sysusers.d/nix.conf
+
   # Create a nixbld group.
-  if ! group_exists $group; then
-    groupadd -r $group
-  else
-    echo "Group '$group' already exists"
-  fi
+  echo "g $group -" >> /etc/sysusers.d/nix.conf
 
   # Create 10 users
-  for i in {1..10}; do
+  for i in $(seq 10); do
     local user=$group$i
-    if ! user_exists $user; then
-      useradd -g $group -G $group -r -N -M -d /var/empty -s /sbin/nologin $user
-    else
-      echo "User '$user' already exists"
-    fi
+    echo "u $user -" >> /etc/sysusers.d/nix.conf
+    echo "m $user $group" >> /etc/sysusers.d/nix.conf
   done
+
+  systemctl restart systemd-sysusers.service
 }
 
 delete_users() {
+  local group=$1
+
+  rm /etc/sysusers.d/nix.conf
+  systemctl restart systemd-sysusers.service
+}
+
+delete_legacy_users() {
   local group=$1
 
   # Remove the users
@@ -469,6 +474,7 @@ do_delete_build_group() {
 
   echo "Deleting group and users ..."
   delete_users $group
+  delete_legacy_users $group
 }
 
 do_enable_nix_daemon() {
@@ -510,12 +516,7 @@ the help of this tool:\n\n\
 \t$0 install"
   fi
 
-  # Step 2: setup sandboxing if required
-  if pm_installed && ( ! sandbox_disabled ) && [ -z "$(sandbox_paths)" ]; then
-    do_install_sandbox || exit 1
-  fi
-
-  # Step 3: setup build users
+  # Step 2: setup build users
   local group=$(build_users_group)
   if [ -z "$group" ] || ( ! group_exists $group ); then
     do_setup_build_group $group || exit 1
@@ -523,6 +524,12 @@ the help of this tool:\n\n\
     # Make sure the /nix folder has the correct permissions
     create_store $group || exit 1
   fi
+
+  # Step 3: setup sandboxing if required
+  if pm_installed && ( ! sandbox_disabled ) && [ -z "$(sandbox_paths)" ]; then
+    do_install_sandbox || exit 1
+  fi
+
 
   # Step 4: launch the daemon
   do_enable_nix_daemon || exit 1
