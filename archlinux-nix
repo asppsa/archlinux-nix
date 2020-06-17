@@ -1,7 +1,7 @@
 #!/bin/sh
 
-sandbox_binaries="bash bzip2 env gzip mkdir mv tar tr xz"
-sandbox_packages="bash bzip2 coreutils gnutar gzip xz"
+sandbox_binaries=""
+sandbox_packages="bash"
 default_nixos_version="20.03"
 default_group="nixbld"
 conf_file=/etc/nix/nix.conf
