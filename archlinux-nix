@@ -61,7 +61,7 @@ do_install() {
   echo "downloading Nix $nix_version binary tarball for $system from '$url' to '$tmpDir'..."
   curl -L "$url" -o "$tarball" || oops "failed to download '$url'"
 
-  local hash1=$(curl $url.sha256)
+  local hash1=$(curl -L $url.sha256)
   local hash2="$(sha256sum -b "$tarball" | cut -c1-64)"
 
   if [ "$hash1" != "$hash2" ]; then
