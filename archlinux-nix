@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/env bash
 
 sandbox_binaries=""
 sandbox_packages="bash"
